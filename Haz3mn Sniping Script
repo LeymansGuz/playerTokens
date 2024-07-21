@@ -1,0 +1,137 @@
+// 1. Install Visual Studio Code
+// 2. Install Node.js
+// 3. Install Roblox Account Manager
+// 4. Run "npm install node-fetch" in Terminal in Visual Studio Code
+// 5. Set the settings in Roblox Account Manager
+// 6. Login your accounts (at least 6) (Accounts are used to bypass Roblox rate limits)
+// 7. Input the accounts below (joinaccount, accountsforrequest, port, pasword)
+// 8. Run the script and wait for Haz3mn (Set everything before you run script)
+
+// If anything doesn't work after your setup, try restarting the program (i.e. Visual Studio Code, Roblox Account Manager)
+
+import fetch from 'node-fetch'
+
+var joinaccount = "ROBLOX" // The account that would join haz3mn's game
+var accountsforrequest = ["ROBLOX","ROBLOX","ROBLOX","ROBLOX","ROBLOX","ROBLOX"] // Usernames for sending presence api requests (Preferred at least 6 accounts)
+var port = 7963 // Port number in Roblox Account Manager
+var password = "LeymansGuz" // Password in Roblox Account Manager
+
+var placeid = 8737602449 // Pls Donate's Place ID
+var snipeid = 151848836 // Haz3mn's user ID (DO NOT CHANGE)
+var haz3mncode = "3CF7355E125E09FC2C6F03021790B6D3" // DO NOT CHANGE
+
+var users = [snipeid]
+users = JSON.stringify({ userIds: users })
+
+var accountchosen = 0
+function findAccount() {
+    var num = accountchosen + 1
+    if (num == accountchosen.length) {
+        num = 0
+    }
+    return accountsforrequest[num];
+}
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getcookie(username) {
+    var cookie = await fetch("http://localhost:" + port + "/GetCookie?Password=" + password + "&Account=" + username)
+    cookie = await cookie.text()
+    return cookie
+}
+
+async function getpresencetype(account) {
+    var cookie = await getcookie(account)
+
+    var response = await fetch("https://presence.roblox.com/v1/presence/users", {
+        "headers": {
+            "content-type": "application/json",
+            "cookie": ".ROBLOSECURITY=" + cookie,
+        },
+        "body": users,
+        "method": "POST"
+    });
+    var data = await response.text()
+    data = JSON.parse(data).userPresences[0]
+    return data
+}
+
+function format(opt, npt) {
+    if (opt == npt) {
+        return null
+    }
+    if (npt == 2) {
+        return "Joined Game"
+    }
+    if (npt == 3) {
+        return "Joined Studio"
+    }
+    if (npt == 0) {
+        return "Offline"
+    }
+    if (npt == 1) {
+        if (opt == 0) {
+            return "Online"
+        }
+        if (opt == 2) {
+            return "Left Game"
+        }
+        if (opt == 3) {
+            return "Left Studio"
+        }
+    }
+}
+
+var cursor = ""
+async function fetchtoken(id) {
+    while (cursor !== null) {
+        const data = await fetch("https://games.roblox.com/v1/games/" + id + "/servers/0?excludeFullGames=false&limit=100&cursor=" + cursor)
+        var response = await data.text()
+        response = JSON.parse(response)
+
+        if (response.data === undefined) {
+            continue
+        }
+
+        cursor = response.nextPageCursor
+        var haz3mndata = response.data
+
+        for (var i = 0; i < haz3mndata.length; i++) {
+            for (const [key, value] of Object.entries(haz3mndata[i].playerTokens)) {
+                if (value === haz3mncode) {
+                    return haz3mndata[i].id
+                }
+            }
+        }
+    }
+}
+
+var presenceData = 0
+
+while (true) {
+    try {
+        var account = findAccount()
+        var newpresenceData = await getpresencetype(account)
+        newpresenceData = newpresenceData.userPresenceType
+        var presenceType = format(presenceData, newpresenceData)
+        presenceData = newpresenceData
+
+        if (presenceType == "Joined Game") {
+            console.log("Detected Haz3mn is playing")
+            for (var i = 0; i < 5; i++) {
+                var jobid = await fetchtoken(placeid)
+                if (jobid !== null && jobid !== undefined) {
+                    console.log("Haz3mn found")
+                    await fetch("http://localhost:" + port + "/LaunchAccount?Account=" + joinaccount + "&PlaceId=8737602449&JobId=" + jobid + "&Password=" + password)
+                    console.log("Place ID: " + placeid + "\nJob ID: " + jobid)
+                    break
+                }
+                await wait(500)
+            }
+        }
+    } catch (err) {
+        console.error(err)
+    }
+}
